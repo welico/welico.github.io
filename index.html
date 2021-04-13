@@ -11,5 +11,10 @@
 <body>
   <h1>Welico, Inc.</h1>
   <p>Welico, Inc. official web.</p>
+  <script>
+  if (location.protocol !== 'https:') {
+    location.replace(`https:${location.href.substring(location.protocol.length)}`);
+  }
+  </script>
 </body>
 </html>
