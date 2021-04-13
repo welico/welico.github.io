@@ -1,1 +1,1 @@
-# welico.github.io
+# Welico, Inc.
