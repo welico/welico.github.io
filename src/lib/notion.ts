@@ -4,9 +4,57 @@
 // Deliberately NOT built here (still open, see ADR-0001 Follow-up "Notion 발행 계약"):
 // - pagination beyond the first page of results
 // - rate-limit handling / keeping the previous build's content on a failed fetch
-// - a full block-to-HTML renderer (only paragraphs/headings/lists are handled; the
+// - a full block-to-HTML renderer (only paragraphs/headings/lists/images are handled; the
 //   database has zero real posts yet, so there is nothing to validate a fuller renderer against)
+import { mkdir, writeFile, access } from 'node:fs/promises';
+import path from 'node:path';
+
 const NOTION_VERSION = '2022-06-28';
+
+// Notion's file.url for uploaded images is a presigned S3 link that expires ~1h after
+// the API response — it can't be used directly as an <img src>. Download it at build
+// time so the deployed page serves a stable local copy.
+// Written straight into the build output dir (astro's default outDir), not public/:
+// astro copies public/ -> dist/ before page rendering runs, so anything written to
+// public/ during getStaticPaths/page render never makes it into the final output.
+// process.cwd() (not import.meta.url) because astro build bundles this module into
+// dist/, which breaks any path resolved relative to the module's own location.
+const ASSETS_DIR = path.join(process.cwd(), 'dist', 'notion-assets');
+
+const EXT_BY_CONTENT_TYPE: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+};
+
+async function downloadNotionImage(url: string, blockId: string): Promise<string> {
+  const urlExt = path.extname(new URL(url).pathname).replace('.', '');
+
+  // Reuse whatever extension a previous build already resolved for this block, so
+  // repeated local builds don't re-fetch an image that's already on disk.
+  for (const ext of [urlExt, ...Object.values(EXT_BY_CONTENT_TYPE)]) {
+    if (!ext) continue;
+    const candidate = path.join(ASSETS_DIR, `${blockId}.${ext}`);
+    try {
+      await access(candidate);
+      return `/notion-assets/${blockId}.${ext}`;
+    } catch {
+      // not cached yet, keep looking / fall through to fetch
+    }
+  }
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`image fetch failed: ${res.status}`);
+  const contentType = res.headers.get('content-type') ?? '';
+  const ext = urlExt || EXT_BY_CONTENT_TYPE[contentType] || 'jpg';
+  const bytes = Buffer.from(await res.arrayBuffer());
+
+  await mkdir(ASSETS_DIR, { recursive: true });
+  await writeFile(path.join(ASSETS_DIR, `${blockId}.${ext}`), bytes);
+  return `/notion-assets/${blockId}.${ext}`;
+}
 
 export interface BlogPost {
   id: string;
@@ -82,7 +130,7 @@ function richTextToPlain(richText: Array<{ plain_text: string }> = []): string {
   return richText.map((t) => t.plain_text).join('');
 }
 
-/** Very small block renderer: paragraph, heading_1-3, bulleted/numbered list items.
+/** Very small block renderer: paragraph, heading_1-3, bulleted/numbered list items, images.
  *  Anything else is skipped — expand once real posts exercise more block types. */
 export async function getPostBlocksHtml(pageId: string): Promise<string> {
   const headers = notionHeaders();
@@ -94,8 +142,21 @@ export async function getPostBlocksHtml(pageId: string): Promise<string> {
     if (!res.ok) return '';
     const data = await res.json();
     const blocks: NotionBlock[] = data.results ?? [];
-    return blocks
-      .map((block) => {
+    const rendered = await Promise.all(
+      blocks.map(async (block) => {
+        if (block.type === 'image') {
+          const image = block.image ?? {};
+          const sourceUrl = image.file?.url ?? image.external?.url;
+          if (!sourceUrl) return '';
+          try {
+            const localSrc = await downloadNotionImage(sourceUrl, block.id);
+            const alt = richTextToPlain(image.caption);
+            return `<img src="${localSrc}" alt="${alt}" loading="lazy" />`;
+          } catch {
+            return '';
+          }
+        }
+
         const text = richTextToPlain(block[block.type]?.rich_text);
         switch (block.type) {
           case 'heading_1':
@@ -113,7 +174,8 @@ export async function getPostBlocksHtml(pageId: string): Promise<string> {
             return '';
         }
       })
-      .join('\n');
+    );
+    return rendered.join('\n');
   } catch {
     return '';
   }
