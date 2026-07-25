@@ -1,0 +1,12 @@
+---
+import CompanyAbout from '../../../components/pages/CompanyAbout.astro';
+import { NON_DEFAULT_LOCALES, type LocaleCode } from '../../../i18n/locales';
+
+export function getStaticPaths() {
+  return NON_DEFAULT_LOCALES.map((l) => ({ params: { lang: l.code } }));
+}
+
+const lang = Astro.params.lang as LocaleCode;
+---
+
+<CompanyAbout lang={lang} />

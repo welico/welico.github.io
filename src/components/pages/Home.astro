@@ -1,0 +1,42 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { t } from '../../i18n/strings';
+import { href, type LocaleCode } from '../../i18n/locales';
+import { PRODUCTS } from '../../data/products';
+
+interface Props {
+  lang: LocaleCode;
+}
+const { lang } = Astro.props;
+const featured = PRODUCTS.slice(0, 3);
+---
+
+<BaseLayout lang={lang} path="" title={`Welico — ${t(lang, 'home.title')}`}>
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">{t(lang, 'home.eyebrow')}</span>
+      <h1>{t(lang, 'home.title')}</h1>
+      <p class="lead">{t(lang, 'home.lead')}</p>
+      <div class="actions">
+        <a class="btn btn-primary" href={href(lang, 'products')}>{t(lang, 'home.cta.products')}</a>
+        <a class="btn btn-ghost" href={href(lang, 'business')}>{t(lang, 'home.cta.business')}</a>
+      </div>
+    </div>
+  </section>
+  <section class="surface">
+    <div class="wrap">
+      <span class="eyebrow">{t(lang, 'home.featured.eyebrow')}</span>
+      <h2>{t(lang, 'home.featured.title')}</h2>
+      <div class="grid grid-3">
+        {featured.map((p) => (
+          <div class="card">
+            <span class="badge">{p.status}</span>
+            <h3>{p.name}</h3>
+            <p>{p.description}</p>
+            <a class="btn btn-ghost" href={href(lang, 'products')}>{t(lang, 'products.view')}</a>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,147 @@
+---
+import '../styles/global.css';
+import { DEFAULT_LOCALE, LOCALES, NON_DEFAULT_LOCALES, href, isRtl, type LocaleCode } from '../i18n/locales';
+import { t } from '../i18n/strings';
+
+interface Props {
+  lang: LocaleCode;
+  /** Site-relative path with no leading slash, e.g. '' | 'products' | 'company/about'. */
+  path: string;
+  title: string;
+  description?: string;
+  /** Locales this specific page actually exists in (default: all). Blog is en-only for now
+   *  — translation scope is still an open question, see PRD Open Questions 1. */
+  alternateLocales?: LocaleCode[];
+}
+
+const { lang, path, title, description, alternateLocales } = Astro.props;
+const rtl = isRtl(lang);
+const canonical = new URL(href(lang, path), Astro.site).toString();
+const hreflangLocales = LOCALES.filter((l) => !alternateLocales || alternateLocales.includes(l.code));
+
+const NAV: Array<{ key: string; path: string }> = [
+  { key: 'nav.products', path: 'products' },
+  { key: 'nav.business', path: 'business' },
+  { key: 'nav.developers', path: 'developers' },
+  { key: 'nav.company', path: 'company/about' },
+];
+---
+
+<!doctype html>
+<html lang={lang} dir={rtl ? 'rtl' : 'ltr'}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    <link rel="canonical" href={canonical} />
+    {hreflangLocales.map((l) => (
+      <link rel="alternate" hreflang={l.code} href={new URL(href(l.code, path), Astro.site).toString()} />
+    ))}
+    <link rel="alternate" hreflang="x-default" href={new URL(href(DEFAULT_LOCALE, path), Astro.site).toString()} />
+    <link rel="icon" href="/brand/welico-logo-512.png" />
+    <script is:inline>
+      // Applied before paint to avoid a flash of the wrong theme.
+      (function () {
+        var saved = localStorage.getItem('welico-theme') || 'system';
+        if (saved !== 'system') document.documentElement.setAttribute('data-theme', saved);
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site">
+      <div class="bar">
+        <a href={href(lang, '')} class="brand">
+          <img src="/brand/welico-logo-512.png" alt="" width="20" height="20" />
+          Welico
+        </a>
+        <nav class="main-nav" aria-label="Primary">
+          {NAV.map((item) => (
+            <a
+              href={href(lang, item.path)}
+              aria-current={path === item.path || (item.path === 'company/about' && path.startsWith('company/')) ? 'page' : undefined}
+            >
+              {t(lang, item.key)}
+            </a>
+          ))}
+          <a href="https://docs.welico.com">{t(lang, 'nav.docs')}</a>
+        </nav>
+        <div class="controls">
+          <select class="lang-switch" aria-label="Language" id="lang-switch">
+            {LOCALES.map((l) => (
+              <option value={href(l.code, path)} selected={l.code === lang}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <button class="theme-toggle" type="button" id="theme-toggle">
+            {t(lang, 'theme.system')}
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div>
+            <h4>{t(lang, 'footer.products')}</h4>
+            <a href={href(lang, 'products')}>{t(lang, 'footer.allProducts')}</a>
+          </div>
+          <div>
+            <h4>{t(lang, 'footer.company')}</h4>
+            <a href={href(lang, 'company/about')}>{t(lang, 'company.about.title')}</a>
+            <a href={href(lang, 'company/team')}>{t(lang, 'company.team.title')}</a>
+            <a href={href(lang, 'company/contact')}>{t(lang, 'company.contact.title')}</a>
+          </div>
+          <div>
+            <h4>{t(lang, 'footer.resources')}</h4>
+            <a href={href(lang, 'blog')}>{t(lang, 'blog.eyebrow')}</a>
+            <a href="https://docs.welico.com">{t(lang, 'nav.docs')}</a>
+          </div>
+          <div>
+            <h4>{t(lang, 'footer.business')}</h4>
+            <a href={href(lang, 'business')}>{t(lang, 'footer.partnerships')}</a>
+          </div>
+        </div>
+        <div class="footer-bottom">{t(lang, 'footer.copyright')}</div>
+      </div>
+    </footer>
+
+    <script is:inline>
+      (function () {
+        var key = 'welico-theme';
+        var root = document.documentElement;
+        var labels = { system: 'Auto', light: 'Light', dark: 'Dark' };
+        function apply(mode) {
+          if (mode === 'system') root.removeAttribute('data-theme');
+          else root.setAttribute('data-theme', mode);
+          var btn = document.getElementById('theme-toggle');
+          if (btn) btn.textContent = labels[mode];
+        }
+        apply(localStorage.getItem(key) || 'system');
+        var btn = document.getElementById('theme-toggle');
+        if (btn) {
+          btn.addEventListener('click', function () {
+            var order = ['system', 'light', 'dark'];
+            var cur = localStorage.getItem(key) || 'system';
+            var next = order[(order.indexOf(cur) + 1) % order.length];
+            localStorage.setItem(key, next);
+            apply(next);
+          });
+        }
+        var select = document.getElementById('lang-switch');
+        if (select) {
+          select.addEventListener('change', function (e) {
+            window.location.href = e.target.value;
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>
