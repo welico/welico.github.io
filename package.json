@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "astro dev",
     "build": "astro build",
+    "dev": "astro dev",
+    "dev stop": "astro dev stop",
     "preview": "astro preview"
   },
   "dependencies": {
