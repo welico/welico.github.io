@@ -29,7 +29,51 @@ const EXT_BY_CONTENT_TYPE: Record<string, string> = {
   'image/svg+xml': 'svg',
 };
 
+// Notion block ids are UUIDs; reject anything else before it touches a file path
+// (defense in depth against a manipulated/unexpected API response landing outside ASSETS_DIR).
+const BLOCK_ID_RE = /^[a-zA-Z0-9-]+$/;
+
+// Blocks fetch targets that would let a Notion editor point an "external image" URL at
+// internal infrastructure (cloud metadata endpoints, localhost, private ranges) — the
+// build runner would otherwise fetch it and publish the response as a public file.
+// ponytail: literal-IP / known-hostname checks only, no DNS resolution — doesn't stop
+// DNS rebinding. Add resolution-time checks if this ever accepts untrusted workspaces.
+function assertSafeImageUrl(rawUrl: string): void {
+  const u = new URL(rawUrl);
+  if (u.protocol !== 'https:') throw new Error(`unsafe image url scheme: ${u.protocol}`);
+  const host = u.hostname.toLowerCase();
+  if (host === 'localhost' || host === 'metadata.google.internal') {
+    throw new Error(`blocked internal host: ${host}`);
+  }
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = ipv4.slice(1).map(Number);
+    const isPrivate =
+      a === 10 ||
+      a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      a === 0;
+    if (isPrivate) throw new Error(`blocked private ip: ${host}`);
+  }
+  if (host === '::1' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) {
+    throw new Error(`blocked private ipv6: ${host}`);
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function downloadNotionImage(url: string, blockId: string): Promise<string> {
+  if (!BLOCK_ID_RE.test(blockId)) throw new Error(`unexpected block id: ${blockId}`);
+  assertSafeImageUrl(url);
   const urlExt = path.extname(new URL(url).pathname).replace('.', '');
 
   // Reuse whatever extension a previous build already resolved for this block, so
@@ -150,14 +194,14 @@ export async function getPostBlocksHtml(pageId: string): Promise<string> {
           if (!sourceUrl) return '';
           try {
             const localSrc = await downloadNotionImage(sourceUrl, block.id);
-            const alt = richTextToPlain(image.caption);
-            return `<img src="${localSrc}" alt="${alt}" loading="lazy" />`;
+            const alt = escapeHtml(richTextToPlain(image.caption));
+            return `<img src="${escapeHtml(localSrc)}" alt="${alt}" loading="lazy" />`;
           } catch {
             return '';
           }
         }
 
-        const text = richTextToPlain(block[block.type]?.rich_text);
+        const text = escapeHtml(richTextToPlain(block[block.type]?.rich_text));
         switch (block.type) {
           case 'heading_1':
             return `<h2>${text}</h2>`;
