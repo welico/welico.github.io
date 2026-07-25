@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { t } from '../../i18n/strings';
+import type { LocaleCode } from '../../i18n/locales';
+import { PRODUCTS } from '../../data/products';
+
+interface Props {
+  lang: LocaleCode;
+}
+const { lang } = Astro.props;
+---
+
+<BaseLayout lang={lang} path="products" title={`Products — Welico`} description={t(lang, 'products.lead')}>
+  <section>
+    <div class="wrap">
+      <span class="eyebrow">{t(lang, 'products.eyebrow')}</span>
+      <h1 style="font-size:var(--text-2xl);">{t(lang, 'products.title')}</h1>
+      <p>{t(lang, 'products.lead')}</p>
+      <div class="grid grid-3">
+        {PRODUCTS.map((p) => (
+          <div class="card">
+            <span class="badge">{p.status}</span>
+            <h3>{p.name}</h3>
+            <p>{p.description}</p>
+            {p.url ? (
+              <a class="btn btn-ghost" href={p.url}>{t(lang, 'products.view')} &rarr;</a>
+            ) : (
+              <span class="btn btn-ghost" style="opacity:.6;">{t(lang, 'products.comingSoon')}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>

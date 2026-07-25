@@ -1,0 +1,15 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { t } from '../i18n/strings';
+import { href } from '../i18n/locales';
+---
+
+<BaseLayout lang="en" path="404" title={`404 — Welico`}>
+  <section>
+    <div class="wrap empty-state">
+      <h1 style="font-size:var(--text-2xl); color:var(--color-text-primary);">{t('en', 'notfound.title')}</h1>
+      <p>{t('en', 'notfound.body')}</p>
+      <a class="btn btn-primary" href={href('en', '')}>{t('en', 'notfound.cta')}</a>
+    </div>
+  </section>
+</BaseLayout>

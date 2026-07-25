@@ -1,0 +1,43 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { t } from '../../i18n/strings';
+import { href } from '../../i18n/locales';
+import { getPublishedPosts } from '../../lib/notion';
+
+const posts = await getPublishedPosts();
+const allTags = [...new Set(posts.flatMap((p) => p.tags))];
+---
+
+<BaseLayout lang="en" path="blog" title={`Blog — Welico`} alternateLocales={['en']}>
+  <section>
+    <div class="wrap">
+      <span class="eyebrow">{t('en', 'blog.eyebrow')}</span>
+      <h1 style="font-size:var(--text-2xl);">{t('en', 'blog.title')}</h1>
+
+      {posts.length === 0 ? (
+        <div class="empty-state">
+          <h3>{t('en', 'blog.empty.title')}</h3>
+          <p>{t('en', 'blog.empty.body')}</p>
+          <a class="btn btn-ghost" href={href('en', 'products')}>{t('en', 'home.cta.products')}</a>
+        </div>
+      ) : (
+        <>
+          <div style="margin: var(--space-6) 0;">
+            <span class="tag active">All</span>
+            {allTags.map((tag) => <span class="tag">{tag}</span>)}
+          </div>
+          <div class="grid grid-2">
+            {posts.map((post) => (
+              <a href={href('en', `blog/${post.slug}`)} class="card">
+                <span class="muted" style="font-size:var(--text-sm);">
+                  {post.publishedDate ?? ''} {post.tags[0] ? `· ${post.tags[0]}` : ''}
+                </span>
+                <h3 style="margin-top:var(--space-2);">{post.title}</h3>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  </section>
+</BaseLayout>

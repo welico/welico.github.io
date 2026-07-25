@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { t } from '../../i18n/strings';
+import type { LocaleCode } from '../../i18n/locales';
+
+interface Props {
+  lang: LocaleCode;
+}
+const { lang } = Astro.props;
+---
+
+<BaseLayout lang={lang} path="company/team" title={`${t(lang, 'company.team.title')} — Welico`}>
+  <section>
+    <div class="wrap" style="max-width:720px;">
+      <span class="eyebrow">{t(lang, 'nav.company')}</span>
+      <h1 style="font-size:var(--text-2xl);">{t(lang, 'company.team.title')}</h1>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>Jiho Lee</h3>
+          <p class="muted">Founder</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

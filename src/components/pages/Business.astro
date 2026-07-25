@@ -1,0 +1,22 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { t } from '../../i18n/strings';
+import type { LocaleCode } from '../../i18n/locales';
+
+interface Props {
+  lang: LocaleCode;
+}
+const { lang } = Astro.props;
+---
+
+<BaseLayout lang={lang} path="business" title={`Business — Welico`} description={t(lang, 'business.p1')}>
+  <section>
+    <div class="wrap" style="max-width:720px;">
+      <span class="eyebrow">{t(lang, 'business.eyebrow')}</span>
+      <h1 style="font-size:var(--text-2xl);">{t(lang, 'business.title')}</h1>
+      <p>{t(lang, 'business.p1')}</p>
+      <p>{t(lang, 'business.p2')}</p>
+      <a class="btn btn-primary" href="mailto:hello@welico.com">{t(lang, 'business.cta')}</a>
+    </div>
+  </section>
+</BaseLayout>

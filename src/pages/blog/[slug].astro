@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublishedPosts, getPostBlocksHtml } from '../../lib/notion';
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  return Promise.all(
+    posts.map(async (post) => ({
+      params: { slug: post.slug },
+      props: { post, bodyHtml: await getPostBlocksHtml(post.id) },
+    }))
+  );
+}
+
+const { post, bodyHtml } = Astro.props;
+---
+
+<BaseLayout lang="en" path={`blog/${post.slug}`} title={`${post.title} — Welico`} alternateLocales={['en']}>
+  <section>
+    <div class="wrap" style="max-width:680px;">
+      <span class="muted" style="font-size:var(--text-sm);">
+        {post.publishedDate ?? ''} {post.tags[0] ? `· ${post.tags[0]}` : ''}
+      </span>
+      <h1 style="font-size:var(--text-2xl); margin-top:var(--space-2);">{post.title}</h1>
+      <div set:html={bodyHtml} />
+      <p><a href="/blog" style="color:var(--color-accent);">&larr; Back to Blog</a></p>
+    </div>
+  </section>
+</BaseLayout>
