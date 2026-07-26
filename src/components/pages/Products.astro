@@ -2,12 +2,13 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { t } from '../../i18n/strings';
 import type { LocaleCode } from '../../i18n/locales';
-import { PRODUCTS } from '../../data/products';
+import { getProducts } from '../../data/products';
 
 interface Props {
   lang: LocaleCode;
 }
 const { lang } = Astro.props;
+const products = await getProducts();
 ---
 
 <BaseLayout lang={lang} path="products" title={`Products — Welico`} description={t(lang, 'products.lead')}>
@@ -17,7 +18,7 @@ const { lang } = Astro.props;
       <h1 style="font-size:var(--text-2xl);">{t(lang, 'products.title')}</h1>
       <p>{t(lang, 'products.lead')}</p>
       <div class="grid grid-3">
-        {PRODUCTS.map((p) => (
+        {products.map((p) => (
           <div class="card">
             <span class="badge">{p.status}</span>
             <h3>{p.name}</h3>

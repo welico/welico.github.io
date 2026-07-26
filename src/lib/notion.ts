@@ -1,9 +1,13 @@
 // Minimal Notion-as-CMS fetch for the Blog (ADR-0001 decision 3, Product - Welico.md Owner
 // decision 18). Scope for this pass: list + detail fetch only.
 //
+// A failed database query throws, which fails `astro build` — GitHub Actions then keeps
+// the last successful deploy instead of publishing an empty list (silent data loss).
+// Missing credentials (no NOTION_TOKEN / database id configured) is treated as "feature
+// off" rather than a failure, so local builds without secrets still succeed with [].
+//
 // Deliberately NOT built here (still open, see ADR-0001 Follow-up "Notion 발행 계약"):
-// - pagination beyond the first page of results
-// - rate-limit handling / keeping the previous build's content on a failed fetch
+// - rate-limit handling
 // - a full block-to-HTML renderer (only paragraphs/headings/lists/images are handled; the
 //   database has zero real posts yet, so there is nothing to validate a fuller renderer against)
 import { mkdir, writeFile, access } from 'node:fs/promises';
@@ -108,12 +112,12 @@ export interface BlogPost {
   publishedDate: string | null;
 }
 
-interface NotionPageResult {
+export interface NotionPageResult {
   id: string;
   properties: Record<string, any>;
 }
 
-function notionHeaders() {
+export function notionHeaders() {
   const token = import.meta.env.NOTION_TOKEN;
   if (!token) return null;
   return {
@@ -121,6 +125,31 @@ function notionHeaders() {
     'Notion-Version': NOTION_VERSION,
     'Content-Type': 'application/json',
   };
+}
+
+/** Queries a database, following has_more/next_cursor until every page is collected.
+ *  Throws on a non-ok response instead of swallowing it — callers let this fail the build. */
+export async function queryNotionDatabaseAll(
+  databaseId: string,
+  headers: Record<string, string>,
+  body: Record<string, any> = {}
+): Promise<NotionPageResult[]> {
+  const results: NotionPageResult[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...body, start_cursor: cursor, page_size: 100 }),
+    });
+    if (!res.ok) {
+      throw new Error(`Notion query failed for database ${databaseId}: ${res.status} ${res.statusText}`);
+    }
+    const data = await res.json();
+    results.push(...(data.results ?? []));
+    cursor = data.has_more ? data.next_cursor : undefined;
+  } while (cursor);
+  return results;
 }
 
 function mapPost(page: NotionPageResult): BlogPost {
@@ -134,29 +163,19 @@ function mapPost(page: NotionPageResult): BlogPost {
   };
 }
 
-/** Published posts, newest first. Returns [] on any error (missing creds, network, empty DB)
- *  rather than failing the build — see the "not built here" note above for what's deferred. */
+/** Published posts, newest first, across all pages of the database. Returns [] only when
+ *  Notion isn't configured (no NOTION_TOKEN / NOTION_DATABASE_ID); a configured fetch that
+ *  fails throws so the build fails instead of publishing an empty list. */
 export async function getPublishedPosts(): Promise<BlogPost[]> {
   const headers = notionHeaders();
   const databaseId = import.meta.env.NOTION_DATABASE_ID;
   if (!headers || !databaseId) return [];
 
-  try {
-    const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        filter: { property: 'Status', select: { equals: 'Published' } },
-        sorts: [{ property: 'Published Date', direction: 'descending' }],
-        page_size: 100,
-      }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.results ?? []).map(mapPost);
-  } catch {
-    return [];
-  }
+  const results = await queryNotionDatabaseAll(databaseId, headers, {
+    filter: { property: 'Status', select: { equals: 'Published' } },
+    sorts: [{ property: 'Published Date', direction: 'descending' }],
+  });
+  return results.map(mapPost);
 }
 
 export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
